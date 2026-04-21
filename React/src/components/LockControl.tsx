@@ -31,6 +31,8 @@ export function LockControl({ lockStatus, onLockChange }: LockControlProps) {
         body: JSON.stringify({ method: 'remote' }),
       });
       if (!resp.ok) throw new Error(`Erreur serveur: ${resp.status}`);
+      const data = await resp.json() as { status?: string };
+      if (data.status !== 'OK') throw new Error('Réponse inattendue du serveur');
       onLockChange(!lockStatus.locked);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');

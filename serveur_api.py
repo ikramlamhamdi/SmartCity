@@ -22,11 +22,7 @@ _VALID_DOMAINS = {"traffic", "school", "home"}
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-dernieres_alertes: Dict[str, Optional[Dict]] = {
-    "traffic": None,
-    "school": None,
-    "home": None,
-}
+dernieres_alertes: Dict[str, Optional[Dict]] = {d: None for d in _VALID_DOMAINS}
 
 # Sensor readings – keyed by sensor id
 capteurs: Dict[str, Dict] = {}
@@ -128,7 +124,7 @@ def recevoir_alerte():
         if not required.issubset(payload):
             return jsonify({"error": "Champs manquants"}), 400
 
-        if payload['domain'] not in dernieres_alertes:
+        if payload['domain'] not in _VALID_DOMAINS:
             return jsonify({"error": "Domaine invalide (traffic|school|home)"}), 400
 
         alerte = creer_alerte(
@@ -179,7 +175,8 @@ def clear_alerts():
     """Efface toutes les alertes."""
     global alertes
     alertes = []
-    dernieres_alertes.update({k: None for k in dernieres_alertes})
+    for k in dernieres_alertes:
+        dernieres_alertes[k] = None
     return jsonify({"status": "OK", "message": "Alertes effacées"}), 200
 
 
