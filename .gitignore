@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.env
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Node / React (handled by React/.gitignore, but mirror here)
+node_modules/
+React/dist/
+
+# Alerts screenshots saved by detection_alerte.py
+alerts/*.jpg
+alerts/*.png
+
+# macOS / editors
+.DS_Store
+*.swp
+*.swo
+.idea/
