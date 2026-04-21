@@ -14,6 +14,11 @@ build/
 node_modules/
 React/dist/
 
+# TypeScript build info and generated JS
+*.tsbuildinfo
+*.d.ts
+*.js
+
 # Alerts screenshots saved by detection_alerte.py
 alerts/*.jpg
 alerts/*.png
