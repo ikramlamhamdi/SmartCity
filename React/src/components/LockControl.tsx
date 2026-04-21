@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { LockStatus } from '../types/alert';
+import { API_BASE_URL } from '../config';
 
 interface LockControlProps {
   lockStatus: LockStatus;
@@ -20,8 +21,8 @@ export function LockControl({ lockStatus, onLockChange }: LockControlProps) {
     setLoading(true);
     setError(null);
     const endpoint = lockStatus.locked
-      ? 'http://127.0.0.1:8000/api/lock/unlock'
-      : 'http://127.0.0.1:8000/api/lock/lock';
+      ? `${API_BASE_URL}/api/lock/unlock`
+      : `${API_BASE_URL}/api/lock/lock`;
 
     try {
       const resp = await fetch(endpoint, {

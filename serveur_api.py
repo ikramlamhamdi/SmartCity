@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Optional
+import logging
 import threading
 import time
 
@@ -9,11 +10,17 @@ app = Flask(__name__)
 CORS(app)
 
 # ──────────────────────────────────────────────
-# In-memory storage
+# Module-level constants
 # ──────────────────────────────────────────────
 
-alertes: List[Dict] = []
 MAX_ALERTS = 200
+STALE_SENSOR_SECONDS = 300   # 5 minutes without update → offline
+REFRESH_INTERVAL_SECONDS = 30
+
+_VALID_DOMAINS = {"traffic", "school", "home"}
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 dernieres_alertes: Dict[str, Optional[Dict]] = {
     "traffic": None,
@@ -78,7 +85,6 @@ def ajouter_alerte(alerte: Dict):
 
 def _auto_refresh_loop():
     """Tâche de fond : nettoyage et vérification des capteurs toutes les 30 s."""
-    STALE_SECONDS = 300   # 5 minutes sans mise à jour → hors-ligne
     while True:
         try:
             now = datetime.now()
@@ -87,7 +93,7 @@ def _auto_refresh_loop():
                     last = datetime.fromisoformat(sensor["last_updated"])
                 except (KeyError, ValueError):
                     continue
-                if (now - last).total_seconds() > STALE_SECONDS:
+                if (now - last).total_seconds() > STALE_SENSOR_SECONDS:
                     if sensor.get("status") != "offline":
                         capteurs[sid]["status"] = "offline"
                         alerte = creer_alerte(
@@ -99,10 +105,10 @@ def _auto_refresh_loop():
                             data={"sensor_id": sid},
                         )
                         ajouter_alerte(alerte)
-                        print(f"⚠️  Capteur hors-ligne: {sid}")
+                        logger.warning("Capteur hors-ligne: %s", sid)
         except Exception as exc:
-            print(f"❌ Erreur auto-refresh: {exc}")
-        time.sleep(30)
+            logger.error("Erreur auto-refresh: %s", exc)
+        time.sleep(REFRESH_INTERVAL_SECONDS)
 
 
 _refresh_thread = threading.Thread(target=_auto_refresh_loop, daemon=True)
@@ -138,8 +144,8 @@ def recevoir_alerte():
         return jsonify({"status": "OK", "alert_id": alerte['id']}), 200
 
     except Exception as exc:
-        print(f"❌ Erreur: {exc}")
-        return jsonify({"error": str(exc)}), 500
+        logger.error("Erreur recevoir_alerte: %s", exc)
+        return jsonify({"error": "Erreur interne du serveur"}), 500
 
 
 @app.route('/api/status', methods=['GET'])
@@ -173,7 +179,7 @@ def clear_alerts():
     """Efface toutes les alertes."""
     global alertes
     alertes = []
-    dernieres_alertes.update({"traffic": None, "school": None, "home": None})
+    dernieres_alertes.update({k: None for k in dernieres_alertes})
     return jsonify({"status": "OK", "message": "Alertes effacées"}), 200
 
 
@@ -255,8 +261,8 @@ def update_sensor():
         return jsonify({"status": "OK", "sensor_id": sid}), 200
 
     except Exception as exc:
-        print(f"❌ Erreur mise à jour capteur: {exc}")
-        return jsonify({"error": str(exc)}), 500
+        logger.error("Erreur update_sensor: %s", exc)
+        return jsonify({"error": "Erreur interne du serveur"}), 500
 
 
 # ──────────────────────────────────────────────
@@ -282,10 +288,11 @@ def unlock_door():
             "last_action": "unlock",
             "last_updated": now,
         })
-        print(f"🔓 Porte déverrouillée via {method}")
+        logger.info("Porte déverrouillée via %s", method)
         return jsonify({"status": "OK", "locked": False, "method": method}), 200
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+        logger.error("Erreur unlock_door: %s", exc)
+        return jsonify({"error": "Erreur interne du serveur"}), 500
 
 
 @app.route('/api/lock/lock', methods=['POST'])
@@ -301,10 +308,11 @@ def lock_door():
             "last_action": "lock",
             "last_updated": now,
         })
-        print(f"🔒 Porte verrouillée via {method}")
+        logger.info("Porte verrouillée via %s", method)
         return jsonify({"status": "OK", "locked": True, "method": method}), 200
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+        logger.error("Erreur lock_door: %s", exc)
+        return jsonify({"error": "Erreur interne du serveur"}), 500
 
 
 # ──────────────────────────────────────────────
@@ -346,7 +354,8 @@ def update_traffic_light(light_id):
             feux_circulation[light_id]['last_updated'] = datetime.now().isoformat()
         return jsonify({"status": "OK", "light": feux_circulation[light_id]}), 200
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+        logger.error("Erreur update_traffic_light: %s", exc)
+        return jsonify({"error": "Erreur interne du serveur"}), 500
 
 
 @app.route('/api/traffic/incidents', methods=['GET'])
@@ -376,7 +385,8 @@ def report_incident():
         ajouter_alerte(alerte)
         return jsonify({"status": "OK", "alert_id": alerte['id']}), 200
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+        logger.error("Erreur report_incident: %s", exc)
+        return jsonify({"error": "Erreur interne du serveur"}), 500
 
 
 # ──────────────────────────────────────────────
